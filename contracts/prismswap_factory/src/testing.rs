@@ -128,12 +128,8 @@ fn create_pair() {
     let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
 
     let asset_infos = [
-        AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset0000"),
-        },
-        AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset0001"),
-        },
+        AssetInfo::Cw20(Addr::unchecked("asset0000")),
+        AssetInfo::Cw20(Addr::unchecked("asset0001")),
     ];
 
     let msg = ExecuteMsg::CreatePair {
@@ -152,7 +148,7 @@ fn create_pair() {
         res.attributes,
         vec![
             attr("action", "create_pair"),
-            attr("pair", "asset0000-asset0001")
+            attr("pair", "cw20:asset0000-cw20:asset0001")
         ]
     );
     assert_eq!(
@@ -191,12 +187,8 @@ fn reply_test() {
     let mut deps = mock_dependencies(&[]);
 
     let asset_infos = [
-        AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset0000"),
-        },
-        AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset0001"),
-        },
+        AssetInfo::Cw20(Addr::unchecked("asset0000")),
+        AssetInfo::Cw20(Addr::unchecked("asset0001")),
     ];
 
     let pair_key = pair_key(&asset_infos);

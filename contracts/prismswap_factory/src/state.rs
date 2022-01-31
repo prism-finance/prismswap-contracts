@@ -1,4 +1,7 @@
-use prismswap::{asset::AssetInfo, factory::FeeConfig};
+use prismswap::{
+    asset::{AssetInfo, PrismSwapAssetInfo},
+    factory::FeeConfig,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

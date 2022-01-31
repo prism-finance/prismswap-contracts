@@ -10,7 +10,7 @@ use crate::operations::execute_swap_operation;
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
-use prismswap::asset::{Asset, AssetInfo, PairInfo};
+use prismswap::asset::{Asset, AssetInfo, PairInfo, PrismSwapAssetInfo};
 use prismswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use prismswap::querier::query_pair_info;
 use prismswap::router::{
@@ -130,7 +130,7 @@ pub fn execute_swap_operations(
 
     // Execute minimum amount assertion
     if let Some(minimum_receive) = minimum_receive {
-        let receiver_balance = target_asset_info.query_pool(&deps.querier, to.clone())?;
+        let receiver_balance = target_asset_info.query_pool(&deps.querier, &to)?;
 
         messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: env.contract.address.to_string(),
@@ -154,7 +154,7 @@ fn assert_minium_receive(
     minium_receive: Uint128,
     receiver: Addr,
 ) -> StdResult<Response<TerraMsgWrapper>> {
-    let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
+    let receiver_balance = asset_info.query_pool(&deps.querier, &receiver)?;
     let swap_amount = receiver_balance.checked_sub(prev_balance)?;
 
     if swap_amount < minium_receive {
@@ -205,29 +205,13 @@ fn simulate_swap_operations(
         return Err(StdError::generic_err("exceeded swap operations limit"));
     }
 
-    let mut operation_index = 0;
     let mut offer_amount = offer_amount;
     for operation in operations.into_iter() {
-        operation_index += 1;
-
         match operation {
             SwapOperation::NativeSwap {
                 offer_denom,
                 ask_denom,
             } => {
-                // Deduct tax before query simulation
-                // because last swap is swap_send
-                if operation_index == operations_len {
-                    let asset = Asset {
-                        info: AssetInfo::NativeToken {
-                            denom: offer_denom.clone(),
-                        },
-                        amount: offer_amount,
-                    };
-
-                    offer_amount = offer_amount.checked_sub(asset.compute_tax(&deps.querier)?)?;
-                }
-
                 let res: SwapResponse = terra_querier.query_swap(
                     Coin {
                         denom: offer_denom,
@@ -244,21 +228,11 @@ fn simulate_swap_operations(
             } => {
                 let pair_info: PairInfo = query_pair_info(
                     &deps.querier,
-                    prismswap_factory.clone(),
+                    &prismswap_factory,
                     &[offer_asset_info.clone(), ask_asset_info.clone()],
                 )?;
 
-                // Deduct tax before querying simulation
-                if let AssetInfo::NativeToken { denom } = offer_asset_info.clone() {
-                    let asset = Asset {
-                        info: AssetInfo::NativeToken { denom },
-                        amount: offer_amount,
-                    };
-
-                    offer_amount = offer_amount.checked_sub(asset.compute_tax(&deps.querier)?)?;
-                }
-
-                let mut res: SimulationResponse =
+                let res: SimulationResponse =
                     deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                         contract_addr: pair_info.contract_addr.to_string(),
                         msg: to_binary(&PairQueryMsg::Simulation {
@@ -268,18 +242,6 @@ fn simulate_swap_operations(
                             },
                         })?,
                     }))?;
-
-                // Deduct tax after querying simulation
-                if let AssetInfo::NativeToken { denom } = ask_asset_info {
-                    let asset = Asset {
-                        info: AssetInfo::NativeToken { denom },
-                        amount: res.return_amount,
-                    };
-
-                    res.return_amount = res
-                        .return_amount
-                        .checked_sub(asset.compute_tax(&deps.querier)?)?;
-                }
 
                 offer_amount = res.return_amount;
             }
@@ -299,12 +261,8 @@ fn assert_operations(operations: &[SwapOperation]) -> StdResult<()> {
                 offer_denom,
                 ask_denom,
             } => (
-                AssetInfo::NativeToken {
-                    denom: offer_denom.clone(),
-                },
-                AssetInfo::NativeToken {
-                    denom: ask_denom.clone(),
-                },
+                AssetInfo::Native(offer_denom.to_string()),
+                AssetInfo::Native(ask_denom.to_string()),
             ),
             SwapOperation::PrismSwap {
                 offer_asset_info,
@@ -337,20 +295,12 @@ fn test_invalid_operations() {
             ask_denom: "uluna".to_string(),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
+            offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+            ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "uluna".to_string(),
-            },
+            offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+            ask_asset_info: AssetInfo::Native("uluna".to_string()),
         }
     ])
     .is_ok());
@@ -362,28 +312,16 @@ fn test_invalid_operations() {
             ask_denom: "uluna".to_string(),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
+            offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+            ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "uluna".to_string(),
-            },
+            offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+            ask_asset_info: AssetInfo::Native("uluna".to_string()),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "uluna".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0002"),
-            },
+            offer_asset_info: AssetInfo::Native("uluna".to_string()),
+            ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
         },
     ])
     .is_ok());
@@ -395,28 +333,16 @@ fn test_invalid_operations() {
             ask_denom: "ukrw".to_string(),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
+            offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+            ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0001"),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "uaud".to_string(),
-            },
+            offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+            ask_asset_info: AssetInfo::Native("uaud".to_string()),
         },
         SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "uluna".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0002"),
-            },
+            offer_asset_info: AssetInfo::Native("uluna".to_string()),
+            ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
         },
     ])
     .is_err());

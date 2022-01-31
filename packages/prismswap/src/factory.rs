@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
-use crate::asset::{AssetInfo, PairInfo};
+use crate::asset::PairInfo;
 use cosmwasm_std::{Addr, Decimal};
+use cw_asset::AssetInfo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
