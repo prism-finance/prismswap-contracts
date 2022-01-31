@@ -5,8 +5,8 @@ use cosmwasm_std::{
     StdResult, SubMsg, WasmMsg,
 };
 
+use crate::parse_reply::parse_reply_instantiate_data;
 use crate::querier::query_pair_info;
-use crate::response::MsgInstantiateContractResponse;
 use crate::state::{
     pair_key, read_pairs, Config, PairConfig, TmpPairInfo, CONFIG, PAIRS, TMP_PAIR_INFO,
 };
@@ -17,7 +17,6 @@ use prismswap::factory::{
     PairConfigResponse, PairsConfigResponse, PairsResponse, QueryMsg,
 };
 use prismswap::pair::InstantiateMsg as PairInstantiateMsg;
-use protobuf::Message;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -220,18 +219,15 @@ pub fn execute_deregister(
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
     let tmp_pair_info = TMP_PAIR_INFO.load(deps.storage)?;
 
-    let res: MsgInstantiateContractResponse =
-        Message::parse_from_bytes(msg.result.unwrap().data.unwrap().as_slice()).map_err(|_| {
-            StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
-        })?;
-
-    let pair_contract = res.get_contract_address();
+    let res = parse_reply_instantiate_data(msg)
+        .map_err(|err| StdError::generic_err(format!("{}", err)))?;
+    let pair_contract = res.contract_address;
 
     PAIRS.save(
         deps.storage,
         &tmp_pair_info.pair_key,
         &PairConfig {
-            pair_address: deps.api.addr_validate(pair_contract)?,
+            pair_address: deps.api.addr_validate(&pair_contract)?,
             fee_config: tmp_pair_info.fee_config,
         },
     )?;

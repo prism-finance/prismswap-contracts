@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use terra_cosmwasm::TerraMsgWrapper;
 
 use crate::pair::ExecuteMsg as PairExecuteMsg;
-use crate::querier::{query_balance, query_token_balance, query_token_symbol};
+use crate::querier::{query_balance, query_token_balance};
 use cosmwasm_std::{
-    to_binary, Addr, Api, Coin, CosmosMsg, Decimal, MessageInfo, QuerierWrapper, StdError,
-    StdResult, Uint128, WasmMsg,
+    to_binary, Addr, Coin, CosmosMsg, Decimal, MessageInfo, QuerierWrapper, StdError, StdResult,
+    Uint128, WasmMsg,
 };
 
 pub use cw_asset::{Asset, AssetInfo};
@@ -171,43 +171,4 @@ impl PrismSwapAsset for Asset {
             Ok(())
         }
     }
-}
-
-/// ## Description
-/// Returns the validated address in lowercase on success. Otherwise returns [`Err`]
-/// ## Params
-/// * **api** is a object of type [`Api`]
-///
-/// * **addr** is the object of type [`Addr`]
-pub fn addr_validate_to_lower(api: &dyn Api, addr: &str) -> StdResult<Addr> {
-    if addr.to_lowercase() != addr {
-        return Err(StdError::generic_err(format!(
-            "Address {} should be lowercase",
-            addr
-        )));
-    }
-    api.addr_validate(addr)
-}
-
-// we need 6 for xPRISM
-const TOKEN_SYMBOL_MAX_LENGTH: usize = 6;
-pub fn format_lp_token_name(
-    asset_infos: &[AssetInfo; 2],
-    querier: &QuerierWrapper,
-) -> StdResult<String> {
-    let mut short_symbols: Vec<String> = vec![];
-    for asset_info in asset_infos {
-        let short_symbol: String;
-        match asset_info {
-            AssetInfo::Native(denom) => {
-                short_symbol = denom.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
-            }
-            AssetInfo::Cw20(contract_addr) => {
-                let token_symbol = query_token_symbol(querier, contract_addr)?;
-                short_symbol = token_symbol.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
-            }
-        }
-        short_symbols.push(short_symbol);
-    }
-    Ok(format!("{}-{}-LP", short_symbols[0], short_symbols[1]).to_uppercase())
 }

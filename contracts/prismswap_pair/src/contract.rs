@@ -1,29 +1,26 @@
 use crate::error::ContractError;
-use crate::response::MsgInstantiateContractResponse;
+use crate::parse_reply::parse_reply_instantiate_data;
 use crate::state::{Config, CONFIG};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    MessageInfo, Reply, ReplyOn, Response, StdError, SubMsg, Uint128, WasmMsg,
+    from_binary, to_binary, Addr, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
+    QuerierWrapper, Reply, ReplyOn, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
 
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
-use prismswap::asset::{
-    format_lp_token_name, Asset, AssetInfo, PairInfo, PrismSwapAsset, PrismSwapAssetInfo,
-};
+use prismswap::asset::{Asset, AssetInfo, PairInfo, PrismSwapAsset, PrismSwapAssetInfo};
 use prismswap::factory::FeeInfoResponse;
 use prismswap::pair::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg,
     ReverseSimulationResponse, SimulationResponse,
 };
-use prismswap::querier::{query_fee_info, query_supply};
+use prismswap::querier::{query_fee_info, query_supply, query_token_symbol};
 use prismswap::token::InstantiateMsg as TokenInstantiateMsg;
-use protobuf::Message;
 
 const INSTANTIATE_REPLY_ID: u64 = 1;
 
@@ -189,14 +186,10 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
         return Err(ContractError::Unauthorized {});
     }
 
-    let data = msg.result.unwrap().data.unwrap();
-    let res: MsgInstantiateContractResponse =
-        Message::parse_from_bytes(data.as_slice()).map_err(|_| {
-            StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
-        })?;
-    let liquidity_token = res.get_contract_address();
+    let res = parse_reply_instantiate_data(msg).map_err(|_| ContractError::ParseReplyError {})?;
+    let liquidity_token = res.contract_address;
 
-    config.pair_info.liquidity_token = deps.api.addr_validate(res.get_contract_address())?;
+    config.pair_info.liquidity_token = deps.api.addr_validate(&liquidity_token)?;
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attribute("liquidity_token_addr", liquidity_token))
@@ -583,13 +576,6 @@ pub fn query_reverse_simulation(
     })
 }
 
-pub fn amount_of(coins: &[Coin], denom: String) -> Uint128 {
-    match coins.iter().find(|x| x.denom == denom) {
-        Some(coin) => coin.amount,
-        None => Uint128::zero(),
-    }
-}
-
 fn compute_swap(
     offer_pool: Uint128,
     ask_pool: Uint128,
@@ -714,4 +700,27 @@ fn assert_slippage_tolerance(
     }
 
     Ok(())
+}
+
+// we need 6 for xPRISM
+const TOKEN_SYMBOL_MAX_LENGTH: usize = 6;
+fn format_lp_token_name(
+    asset_infos: &[AssetInfo; 2],
+    querier: &QuerierWrapper,
+) -> Result<String, ContractError> {
+    let mut short_symbols: Vec<String> = vec![];
+    for asset_info in asset_infos {
+        let short_symbol: String;
+        match asset_info {
+            AssetInfo::Native(denom) => {
+                short_symbol = denom.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
+            }
+            AssetInfo::Cw20(contract_addr) => {
+                let token_symbol = query_token_symbol(querier, contract_addr)?;
+                short_symbol = token_symbol.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
+            }
+        }
+        short_symbols.push(short_symbol);
+    }
+    Ok(format!("{}-{}-LP", short_symbols[0], short_symbols[1]).to_uppercase())
 }
