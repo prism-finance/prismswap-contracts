@@ -11,7 +11,7 @@ use crate::state::{
     pair_key, read_pairs, Config, PairConfig, TmpPairInfo, CONFIG, PAIRS, TMP_PAIR_INFO,
 };
 
-use prismswap::asset::{AssetInfo, PairInfo};
+use prismswap::asset::{AssetInfo, PairInfo, PrismSwapAssetInfo};
 use prismswap::factory::{
     ConfigResponse, ExecuteMsg, FeeConfig, FeeInfoResponse, InstantiateMsg, MigrateMsg,
     PairConfigResponse, PairsConfigResponse, PairsResponse, QueryMsg,
@@ -49,12 +49,24 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::CreatePair {
             asset_infos,
             fee_config,
-        } => execute_create_pair(deps, info, env, asset_infos, fee_config),
+        } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_create_pair(deps, info, env, asset_infos, fee_config)
+        }
         ExecuteMsg::UpdatePairConfig {
             asset_infos,
             fee_config,
-        } => execute_update_pair_config(deps, info, asset_infos, fee_config),
-        ExecuteMsg::Deregister { asset_infos } => execute_deregister(deps, info, asset_infos),
+        } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_update_pair_config(deps, info, asset_infos, fee_config)
+        }
+        ExecuteMsg::Deregister { asset_infos } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_deregister(deps, info, asset_infos)
+        }
     }
 }
 

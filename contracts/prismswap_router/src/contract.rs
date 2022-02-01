@@ -50,8 +50,21 @@ pub fn execute(
             operations,
             minimum_receive,
             to,
-        } => execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
+        } => {
+            for operation in &operations {
+                if let SwapOperation::PrismSwap {
+                    offer_asset_info,
+                    ask_asset_info,
+                } = &operation
+                {
+                    offer_asset_info.check(deps.api)?;
+                    ask_asset_info.check(deps.api)?;
+                };
+            }
+            execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to)
+        }
         ExecuteMsg::ExecuteSwapOperation { operation, to } => {
+            // this can only be called internally, no need to validate AssetInfo
             execute_swap_operation(deps, env, info, operation, to.map(|v| v.to_string()))
         }
         ExecuteMsg::AssertMinimumReceive {
@@ -59,13 +72,16 @@ pub fn execute(
             prev_balance,
             minimum_receive,
             receiver,
-        } => assert_minium_receive(
-            deps.as_ref(),
-            asset_info,
-            prev_balance,
-            minimum_receive,
-            receiver,
-        ),
+        } => {
+            asset_info.check(deps.api)?;
+            assert_minimum_receive(
+                deps.as_ref(),
+                asset_info,
+                prev_balance,
+                minimum_receive,
+                receiver,
+            )
+        }
     }
 }
 
@@ -147,7 +163,7 @@ pub fn execute_swap_operations(
     Ok(Response::new().add_messages(messages))
 }
 
-fn assert_minium_receive(
+fn assert_minimum_receive(
     deps: Deps,
     asset_info: AssetInfo,
     prev_balance: Uint128,
