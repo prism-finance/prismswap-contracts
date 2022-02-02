@@ -107,7 +107,7 @@ pub fn execute_update_config(
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-// Anyone can execute it to create swap pair
+// Only owner can create pairs
 pub fn execute_create_pair(
     deps: DepsMut,
     info: MessageInfo,
@@ -126,7 +126,7 @@ pub fn execute_create_pair(
     let fee_config: FeeConfig = fee_config.unwrap_or_default();
     if !fee_config.is_valid() {
         return Err(StdError::generic_err(
-            "The given fee configuraiton is not valid",
+            "The given fee configuration is not valid",
         ));
     }
 
@@ -184,7 +184,7 @@ pub fn execute_update_pair_config(
     // validate the given fee configuration
     if !fee_config.is_valid() {
         return Err(StdError::generic_err(
-            "The given fee configuraiton is not valid",
+            "The given fee configuration is not valid",
         ));
     }
 

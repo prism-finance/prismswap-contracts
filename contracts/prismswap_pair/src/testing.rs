@@ -1,20 +1,17 @@
-use crate::contract::{
-    assert_max_spread, execute, instantiate, query_pair_info, query_pool, query_reverse_simulation,
-    query_simulation, reply,
-};
+use crate::contract::{assert_max_spread, execute, instantiate, query, reply};
 use crate::error::ContractError;
 use crate::mock_querier::mock_dependencies;
 
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    attr, to_binary, Addr, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, Reply, ReplyOn,
-    Response, StdError, SubMsg, SubMsgExecutionResponse, Uint128, WasmMsg,
+    attr, from_binary, to_binary, Addr, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, Reply,
+    ReplyOn, Response, StdError, SubMsg, SubMsgExecutionResponse, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use prismswap::asset::{Asset, AssetInfo, PairInfo};
 use prismswap::pair::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, ReverseSimulationResponse,
-    SimulationResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg,
+    ReverseSimulationResponse, SimulationResponse,
 };
 use prismswap::token::InstantiateMsg as TokenInstantiateMsg;
 
@@ -27,6 +24,40 @@ fn proper_initialization() {
         &[(&String::from(MOCK_CONTRACT_ADDR), &Uint128::new(123u128))],
     )]);
 
+    // failure - invalid token addr
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("te")),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
+
+    // failure - doubling assets
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Native("uusd".to_string()),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(err, ContractError::DoublingAssets {});
+
+    // success
     let msg = InstantiateMsg {
         asset_infos: [
             AssetInfo::Native("uusd".to_string()),
@@ -84,7 +115,9 @@ fn proper_initialization() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // it worked, let's query the state
-    let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
+    let pair_info: PairInfo =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Pair {}).unwrap()).unwrap();
+
     assert_eq!("liquidity0000", pair_info.liquidity_token.as_str());
     assert_eq!(
         pair_info.asset_infos,
@@ -93,6 +126,16 @@ fn proper_initialization() {
             AssetInfo::Cw20(Addr::unchecked("asset0000"))
         ]
     );
+
+    let config_response: ConfigResponse =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap();
+    assert_eq!(
+        config_response,
+        ConfigResponse {
+            pair_info,
+            factory: Addr::unchecked("factory0000"),
+        }
+    )
 }
 
 #[test]
@@ -109,6 +152,25 @@ fn provide_liquidity() {
         ),
         (&"asset0000".to_string(), &[]),
     ]);
+
+    // failure - invalid token addr
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("te")),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
 
     let msg = InstantiateMsg {
         asset_infos: [
@@ -671,25 +733,38 @@ fn try_native_to_token() {
         }],
     )]);
 
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::Native("uusd".to_string()),
-            amount: offer_amount,
-        },
+    let simulation_res: SimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Simulation {
+                offer_asset: Asset {
+                    info: AssetInfo::Native("uusd".to_string()),
+                    amount: offer_amount,
+                },
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
+
     assert_eq!(expected_return_amount, simulation_res.return_amount);
     assert_eq!(expected_commission_amount, simulation_res.commission_amount);
     assert_eq!(expected_spread_amount, simulation_res.spread_amount);
 
     // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
-            amount: expected_return_amount,
-        },
+    let reverse_simulation_res: ReverseSimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::ReverseSimulation {
+                ask_asset: Asset {
+                    info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
+                    amount: expected_return_amount,
+                },
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
 
@@ -826,6 +901,26 @@ fn try_token_to_native() {
         _ => panic!("DO NOT ENTER HERE"),
     }
 
+    // failure - invalid token addr
+    let msg = ExecuteMsg::Swap {
+        offer_asset: Asset {
+            info: AssetInfo::Cw20(Addr::unchecked("te")),
+            amount: offer_amount,
+        },
+        belief_price: None,
+        max_spread: None,
+        to: None,
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
+
     // normal sell
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".to_string(),
@@ -870,12 +965,18 @@ fn try_token_to_native() {
         ),
     ]);
 
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: offer_amount,
-            info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
-        },
+    let simulation_res: SimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Simulation {
+                offer_asset: Asset {
+                    amount: offer_amount,
+                    info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
+                },
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
     assert_eq!(expected_return_amount, simulation_res.return_amount);
@@ -883,12 +984,18 @@ fn try_token_to_native() {
     assert_eq!(expected_spread_amount, simulation_res.spread_amount);
 
     // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: expected_return_amount,
-            info: AssetInfo::Native("uusd".to_string()),
-        },
+    let reverse_simulation_res: ReverseSimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::ReverseSimulation {
+                ask_asset: Asset {
+                    amount: expected_return_amount,
+                    info: AssetInfo::Native("uusd".to_string()),
+                },
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
     assert!(
@@ -1058,8 +1165,8 @@ fn test_query_pool() {
 
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
-    let res: PoolResponse = query_pool(deps.as_ref()).unwrap();
-
+    let res: PoolResponse =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Pool {}).unwrap()).unwrap();
     assert_eq!(
         res.assets,
         [

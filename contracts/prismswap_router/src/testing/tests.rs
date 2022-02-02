@@ -237,6 +237,37 @@ fn execute_swap_operations() {
             }))
         ]
     );
+
+    // failure - invalid token addr
+    let msg = ExecuteMsg::ExecuteSwapOperations {
+        operations: vec![
+            SwapOperation::NativeSwap {
+                offer_denom: "uusd".to_string(),
+                ask_denom: "ukrw".to_string(),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                ask_asset_info: AssetInfo::Native("uluna".to_string()),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("te")),
+            },
+        ],
+        minimum_receive: Some(Uint128::from(1000000u128)),
+        to: None,
+    };
+
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        StdError::generic_err("Invalid input: human address too short")
+    );
 }
 
 #[test]
@@ -491,4 +522,18 @@ fn assert_minimum_receive_token() {
         ),
         _ => panic!("DO NOT ENTER HERE"),
     }
+
+    // failure - invalid token
+    let msg = ExecuteMsg::AssertMinimumReceive {
+        asset_info: AssetInfo::Cw20(Addr::unchecked("te")),
+        prev_balance: Uint128::zero(),
+        minimum_receive: Uint128::from(1000001u128),
+        receiver: Addr::unchecked("addr0000"),
+    };
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        StdError::generic_err("Invalid input: human address too short")
+    );
 }
