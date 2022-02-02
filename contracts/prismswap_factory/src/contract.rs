@@ -5,19 +5,18 @@ use cosmwasm_std::{
     StdResult, SubMsg, WasmMsg,
 };
 
+use crate::parse_reply::parse_reply_instantiate_data;
 use crate::querier::query_pair_info;
-use crate::response::MsgInstantiateContractResponse;
 use crate::state::{
     pair_key, read_pairs, Config, PairConfig, TmpPairInfo, CONFIG, PAIRS, TMP_PAIR_INFO,
 };
 
-use prismswap::asset::{AssetInfo, PairInfo};
+use prismswap::asset::{AssetInfo, PairInfo, PrismSwapAssetInfo};
 use prismswap::factory::{
     ConfigResponse, ExecuteMsg, FeeConfig, FeeInfoResponse, InstantiateMsg, MigrateMsg,
     PairConfigResponse, PairsConfigResponse, PairsResponse, QueryMsg,
 };
 use prismswap::pair::InstantiateMsg as PairInstantiateMsg;
-use protobuf::Message;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -50,12 +49,24 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::CreatePair {
             asset_infos,
             fee_config,
-        } => execute_create_pair(deps, info, env, asset_infos, fee_config),
+        } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_create_pair(deps, info, env, asset_infos, fee_config)
+        }
         ExecuteMsg::UpdatePairConfig {
             asset_infos,
             fee_config,
-        } => execute_update_pair_config(deps, info, asset_infos, fee_config),
-        ExecuteMsg::Deregister { asset_infos } => execute_deregister(deps, info, asset_infos),
+        } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_update_pair_config(deps, info, asset_infos, fee_config)
+        }
+        ExecuteMsg::Deregister { asset_infos } => {
+            asset_infos[0].check(deps.api)?;
+            asset_infos[1].check(deps.api)?;
+            execute_deregister(deps, info, asset_infos)
+        }
     }
 }
 
@@ -96,7 +107,7 @@ pub fn execute_update_config(
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-// Anyone can execute it to create swap pair
+// Only owner can create pairs
 pub fn execute_create_pair(
     deps: DepsMut,
     info: MessageInfo,
@@ -115,7 +126,7 @@ pub fn execute_create_pair(
     let fee_config: FeeConfig = fee_config.unwrap_or_default();
     if !fee_config.is_valid() {
         return Err(StdError::generic_err(
-            "The given fee configuraiton is not valid",
+            "The given fee configuration is not valid",
         ));
     }
 
@@ -173,7 +184,7 @@ pub fn execute_update_pair_config(
     // validate the given fee configuration
     if !fee_config.is_valid() {
         return Err(StdError::generic_err(
-            "The given fee configuraiton is not valid",
+            "The given fee configuration is not valid",
         ));
     }
 
@@ -220,18 +231,15 @@ pub fn execute_deregister(
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
     let tmp_pair_info = TMP_PAIR_INFO.load(deps.storage)?;
 
-    let res: MsgInstantiateContractResponse =
-        Message::parse_from_bytes(msg.result.unwrap().data.unwrap().as_slice()).map_err(|_| {
-            StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
-        })?;
-
-    let pair_contract = res.get_contract_address();
+    let res = parse_reply_instantiate_data(msg)
+        .map_err(|err| StdError::generic_err(format!("{}", err)))?;
+    let pair_contract = res.contract_address;
 
     PAIRS.save(
         deps.storage,
         &tmp_pair_info.pair_key,
         &PairConfig {
-            pair_address: deps.api.addr_validate(pair_contract)?,
+            pair_address: deps.api.addr_validate(&pair_contract)?,
             fee_config: tmp_pair_info.fee_config,
         },
     )?;

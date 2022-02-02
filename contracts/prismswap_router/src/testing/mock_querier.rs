@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Addr, Coin, ContractResult, Decimal, OwnedDeps, Querier,
+    from_binary, from_slice, to_binary, Addr, Coin, ContractResult, OwnedDeps, Querier,
     QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use schemars::JsonSchema;
@@ -8,11 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg};
-use prismswap::asset::{Asset, AssetInfo, PairInfo};
+use prismswap::asset::{Asset, AssetInfo, PairInfo, PrismSwapAssetInfo};
 use prismswap::pair::SimulationResponse;
-use terra_cosmwasm::{
-    SwapResponse, TaxCapResponse, TaxRateResponse, TerraQuery, TerraQueryWrapper, TerraRoute,
-};
+use terra_cosmwasm::{SwapResponse, TerraQuery, TerraQueryWrapper, TerraRoute};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -39,7 +37,6 @@ pub fn mock_dependencies(
 pub struct WasmMockQuerier {
     base: MockQuerier<TerraQueryWrapper>,
     token_querier: TokenQuerier,
-    tax_querier: TaxQuerier,
     factory_querier: FactoryQuerier,
 }
 
@@ -70,30 +67,6 @@ pub(crate) fn balances_to_map(
         balances_map.insert(contract_addr.to_string(), contract_balances_map);
     }
     balances_map
-}
-
-#[derive(Clone, Default)]
-pub struct TaxQuerier {
-    rate: Decimal,
-    // this lets us iterate over all pairs that match the first string
-    caps: HashMap<String, Uint128>,
-}
-
-impl TaxQuerier {
-    pub fn new(rate: Decimal, caps: &[(&String, &Uint128)]) -> Self {
-        TaxQuerier {
-            rate,
-            caps: caps_to_map(caps),
-        }
-    }
-}
-
-pub(crate) fn caps_to_map(caps: &[(&String, &Uint128)]) -> HashMap<String, Uint128> {
-    let mut owner_map: HashMap<String, Uint128> = HashMap::new();
-    for (denom, cap) in caps.iter() {
-        owner_map.insert(denom.to_string(), **cap);
-    }
-    owner_map
 }
 
 #[derive(Clone, Default)]
@@ -143,27 +116,7 @@ impl WasmMockQuerier {
     pub fn handle_query(&self, request: &QueryRequest<TerraQueryWrapper>) -> QuerierResult {
         match &request {
             QueryRequest::Custom(TerraQueryWrapper { route, query_data }) => {
-                if route == &TerraRoute::Treasury {
-                    match query_data {
-                        TerraQuery::TaxRate {} => {
-                            let res = TaxRateResponse {
-                                rate: self.tax_querier.rate,
-                            };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                        }
-                        TerraQuery::TaxCap { denom } => {
-                            let cap = self
-                                .tax_querier
-                                .caps
-                                .get(denom)
-                                .copied()
-                                .unwrap_or_default();
-                            let res = TaxCapResponse { cap };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                        }
-                        _ => panic!("DO NOT ENTER HERE"),
-                    }
-                } else if route == &TerraRoute::Market {
+                if route == &TerraRoute::Market {
                     match query_data {
                         TerraQuery::Swap {
                             offer_coin,
@@ -182,18 +135,14 @@ impl WasmMockQuerier {
             }
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => match from_binary(msg) {
                 Ok(QueryMsg::Pair { asset_infos }) => {
-                    let key = asset_infos[0].to_string() + asset_infos[1].to_string().as_str();
+                    let key = String::from_utf8(pair_key(&asset_infos)).unwrap();
                     match self.factory_querier.pairs.get(&key) {
                         Some(v) => SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
                             contract_addr: Addr::unchecked(v),
                             liquidity_token: Addr::unchecked("liquidity"),
                             asset_infos: [
-                                AssetInfo::NativeToken {
-                                    denom: "uusd".to_string(),
-                                },
-                                AssetInfo::NativeToken {
-                                    denom: "uusd".to_string(),
-                                },
+                                AssetInfo::Native("uusd".to_string()),
+                                AssetInfo::Native("uusd".to_string()),
                             ],
                         }))),
                         None => SystemResult::Err(SystemError::InvalidRequest {
@@ -254,7 +203,6 @@ impl WasmMockQuerier {
         WasmMockQuerier {
             base,
             token_querier: TokenQuerier::default(),
-            tax_querier: TaxQuerier::default(),
             factory_querier: FactoryQuerier::default(),
         }
     }
@@ -269,11 +217,14 @@ impl WasmMockQuerier {
         self.token_querier = TokenQuerier::new(balances);
     }
 
-    pub fn with_tax(&mut self, rate: Decimal, caps: &[(&String, &Uint128)]) {
-        self.tax_querier = TaxQuerier::new(rate, caps);
-    }
-
     pub fn with_pairs(&mut self, pairs: &[(&String, &String)]) {
         self.factory_querier = FactoryQuerier::new(pairs);
     }
+}
+
+fn pair_key(asset_infos: &[AssetInfo; 2]) -> Vec<u8> {
+    let mut asset_infos = asset_infos.to_vec();
+    asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+
+    [asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat()
 }

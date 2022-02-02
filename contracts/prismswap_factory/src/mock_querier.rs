@@ -70,7 +70,7 @@ impl WasmMockQuerier {
             QueryRequest::Wasm(WasmQuery::Smart {contract_addr, msg})// => {
                 => match from_binary(msg).unwrap() {
                     QueryMsg::Pair {} => {
-                       let pair_info: PairInfo =
+                        let pair_info: PairInfo =
                         match self.pair_querier.pairs.get(contract_addr) {
                             Some(v) => v.clone(),
                             None => {

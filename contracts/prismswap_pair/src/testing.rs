@@ -1,20 +1,17 @@
-use crate::contract::{
-    assert_max_spread, execute, instantiate, query_pair_info, query_pool, query_reverse_simulation,
-    query_simulation, reply,
-};
+use crate::contract::{assert_max_spread, execute, instantiate, query, reply};
 use crate::error::ContractError;
 use crate::mock_querier::mock_dependencies;
 
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    attr, to_binary, Addr, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, Reply, ReplyOn,
-    Response, StdError, SubMsg, SubMsgExecutionResponse, Uint128, WasmMsg,
+    attr, from_binary, to_binary, Addr, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, Reply,
+    ReplyOn, Response, StdError, SubMsg, SubMsgExecutionResponse, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use prismswap::asset::{Asset, AssetInfo, PairInfo};
 use prismswap::pair::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, ReverseSimulationResponse,
-    SimulationResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg,
+    ReverseSimulationResponse, SimulationResponse,
 };
 use prismswap::token::InstantiateMsg as TokenInstantiateMsg;
 
@@ -27,14 +24,44 @@ fn proper_initialization() {
         &[(&String::from(MOCK_CONTRACT_ADDR), &Uint128::new(123u128))],
     )]);
 
+    // failure - invalid token addr
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("te")),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
+
+    // failure - doubling assets
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Native("uusd".to_string()),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(err, ContractError::DoublingAssets {});
+
+    // success
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -88,19 +115,27 @@ fn proper_initialization() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // it worked, let's query the state
-    let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
+    let pair_info: PairInfo =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Pair {}).unwrap()).unwrap();
+
     assert_eq!("liquidity0000", pair_info.liquidity_token.as_str());
     assert_eq!(
         pair_info.asset_infos,
         [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            }
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000"))
         ]
     );
+
+    let config_response: ConfigResponse =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap();
+    assert_eq!(
+        config_response,
+        ConfigResponse {
+            pair_info,
+            factory: Addr::unchecked("factory0000"),
+        }
+    )
 }
 
 #[test]
@@ -118,14 +153,29 @@ fn provide_liquidity() {
         (&"asset0000".to_string(), &[]),
     ]);
 
+    // failure - invalid token addr
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("te")),
+        ],
+        token_code_id: 10u64,
+        factory: Addr::unchecked("factory0000"),
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = instantiate(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
+
+    let msg = InstantiateMsg {
+        asset_infos: [
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -156,15 +206,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(100u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(100u128),
             },
         ],
@@ -235,15 +281,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(100u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(200u128),
             },
         ],
@@ -294,15 +336,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(100u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(50u128),
             },
         ],
@@ -353,15 +391,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(98u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(100u128),
             },
         ],
@@ -396,15 +430,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(100u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(98u128),
             },
         ],
@@ -441,15 +471,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(99u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(100u128),
             },
         ],
@@ -480,15 +506,11 @@ fn provide_liquidity() {
     let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: Uint128::from(100u128),
             },
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: Uint128::from(99u128),
             },
         ],
@@ -513,11 +535,6 @@ fn withdraw_liquidity() {
         denom: "uusd".to_string(),
         amount: Uint128::from(100u128),
     }]);
-
-    deps.querier.with_tax(
-        Decimal::zero(),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
-    );
     deps.querier.with_token_balances(&[
         (
             &"liquidity0000".to_string(),
@@ -531,12 +548,8 @@ fn withdraw_liquidity() {
 
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -618,7 +631,7 @@ fn withdraw_liquidity() {
     );
     assert_eq!(
         log_refund_assets,
-        &attr("refund_assets", "100uusd, 100asset0000")
+        &attr("refund_assets", "native:uusd:100, cw20:asset0000:100")
     );
 }
 
@@ -635,11 +648,6 @@ fn try_native_to_token() {
         amount: collateral_pool_amount + offer_amount, /* user deposit must be pre-applied */
     }]);
 
-    deps.querier.with_tax(
-        Decimal::zero(),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
-    );
-
     deps.querier.with_token_balances(&[
         (
             &"liquidity0000".to_string(),
@@ -653,12 +661,8 @@ fn try_native_to_token() {
 
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -688,9 +692,7 @@ fn try_native_to_token() {
     // normal swap
     let msg = ExecuteMsg::Swap {
         offer_asset: Asset {
-            info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
+            info: AssetInfo::Native("uusd".to_string()),
             amount: offer_amount,
         },
         belief_price: None,
@@ -720,7 +722,6 @@ fn try_native_to_token() {
     let expected_return_amount = expected_ret_amount
         .checked_sub(expected_commission_amount)
         .unwrap();
-    let expected_tax_amount = Uint128::zero(); // no tax for token
     let expected_protocol_fee = expected_commission_amount.multiply_ratio(1u128, 2u128); // 50%
 
     // check simulation res
@@ -732,29 +733,38 @@ fn try_native_to_token() {
         }],
     )]);
 
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+    let simulation_res: SimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Simulation {
+                offer_asset: Asset {
+                    info: AssetInfo::Native("uusd".to_string()),
+                    amount: offer_amount,
+                },
             },
-            amount: offer_amount,
-        },
+        )
+        .unwrap(),
     )
     .unwrap();
+
     assert_eq!(expected_return_amount, simulation_res.return_amount);
     assert_eq!(expected_commission_amount, simulation_res.commission_amount);
     assert_eq!(expected_spread_amount, simulation_res.spread_amount);
 
     // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
+    let reverse_simulation_res: ReverseSimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::ReverseSimulation {
+                ask_asset: Asset {
+                    info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
+                    amount: expected_return_amount,
+                },
             },
-            amount: expected_return_amount,
-        },
+        )
+        .unwrap(),
     )
     .unwrap();
 
@@ -781,11 +791,10 @@ fn try_native_to_token() {
             attr("action", "swap"),
             attr("sender", "addr0000"),
             attr("receiver", "addr0000"),
-            attr("offer_asset", "uusd"),
-            attr("ask_asset", "asset0000"),
+            attr("offer_asset", "native:uusd"),
+            attr("ask_asset", "cw20:asset0000"),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
-            attr("tax_amount", expected_tax_amount.to_string()),
             attr("spread_amount", expected_spread_amount.to_string()),
             attr("commission_amount", expected_commission_amount.to_string()),
             attr("protocol_fee_amount", expected_protocol_fee.to_string()),
@@ -830,10 +839,6 @@ fn try_token_to_native() {
         denom: "uusd".to_string(),
         amount: collateral_pool_amount,
     }]);
-    deps.querier.with_tax(
-        Decimal::percent(1),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
-    );
     deps.querier.with_token_balances(&[
         (
             &"liquidity0000".to_string(),
@@ -850,12 +855,8 @@ fn try_token_to_native() {
 
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -885,9 +886,7 @@ fn try_token_to_native() {
     // unauthorized access; can not execute swap directly for token swap
     let msg = ExecuteMsg::Swap {
         offer_asset: Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
             amount: offer_amount,
         },
         belief_price: None,
@@ -901,6 +900,26 @@ fn try_token_to_native() {
         ContractError::Unauthorized {} => (),
         _ => panic!("DO NOT ENTER HERE"),
     }
+
+    // failure - invalid token addr
+    let msg = ExecuteMsg::Swap {
+        offer_asset: Asset {
+            info: AssetInfo::Cw20(Addr::unchecked("te")),
+            amount: offer_amount,
+        },
+        belief_price: None,
+        max_spread: None,
+        to: None,
+    };
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::generic_err(
+            "Invalid input: human address too short"
+        ))
+    );
 
     // normal sell
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -931,25 +950,7 @@ fn try_token_to_native() {
     let expected_return_amount = expected_ret_amount
         .checked_sub(expected_commission_amount)
         .unwrap();
-    let expected_tax_amount = std::cmp::min(
-        Uint128::from(1000000u128),
-        expected_return_amount
-            .checked_sub(
-                expected_return_amount
-                    .multiply_ratio(Uint128::from(100u128), Uint128::from(101u128)),
-            )
-            .unwrap(),
-    );
     let expected_protocol_fee_amount = expected_commission_amount.multiply_ratio(1u128, 2u128); // 50%
-    let expected_protocol_fee_tax_amount = std::cmp::min(
-        Uint128::from(1000000u128),
-        expected_protocol_fee_amount
-            .checked_sub(
-                expected_protocol_fee_amount
-                    .multiply_ratio(Uint128::from(100u128), Uint128::from(101u128)),
-            )
-            .unwrap(),
-    );
 
     // check simulation res
     // return asset token balance as normal
@@ -964,14 +965,18 @@ fn try_token_to_native() {
         ),
     ]);
 
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: offer_amount,
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
+    let simulation_res: SimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Simulation {
+                offer_asset: Asset {
+                    amount: offer_amount,
+                    info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
+                },
             },
-        },
+        )
+        .unwrap(),
     )
     .unwrap();
     assert_eq!(expected_return_amount, simulation_res.return_amount);
@@ -979,14 +984,18 @@ fn try_token_to_native() {
     assert_eq!(expected_spread_amount, simulation_res.spread_amount);
 
     // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: expected_return_amount,
-            info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+    let reverse_simulation_res: ReverseSimulationResponse = from_binary(
+        &query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::ReverseSimulation {
+                ask_asset: Asset {
+                    amount: expected_return_amount,
+                    info: AssetInfo::Native("uusd".to_string()),
+                },
             },
-        },
+        )
+        .unwrap(),
     )
     .unwrap();
     assert!(
@@ -1012,11 +1021,10 @@ fn try_token_to_native() {
             attr("action", "swap"),
             attr("sender", "addr0000"),
             attr("receiver", "addr0000"),
-            attr("offer_asset", "asset0000"),
-            attr("ask_asset", "uusd"),
+            attr("offer_asset", "cw20:asset0000"),
+            attr("ask_asset", "native:uusd"),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
-            attr("tax_amount", expected_tax_amount.to_string()),
             attr("spread_amount", expected_spread_amount.to_string()),
             attr("commission_amount", expected_commission_amount.to_string()),
             attr(
@@ -1031,9 +1039,7 @@ fn try_token_to_native() {
             to_address: "addr0000".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: expected_return_amount
-                    .checked_sub(expected_tax_amount)
-                    .unwrap(),
+                amount: expected_return_amount,
             }],
         })),
         msg_transfer,
@@ -1043,9 +1049,7 @@ fn try_token_to_native() {
             to_address: "collector".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: expected_protocol_fee_amount
-                    .checked_sub(expected_protocol_fee_tax_amount)
-                    .unwrap(),
+                amount: expected_protocol_fee_amount,
             }],
         })),
         msg_collector,
@@ -1111,35 +1115,6 @@ fn test_max_spread() {
 }
 
 #[test]
-fn test_deduct() {
-    let mut deps = mock_dependencies(&[]);
-
-    let tax_rate = Decimal::percent(2);
-    let tax_cap = Uint128::from(1_000_000u128);
-    deps.querier.with_tax(
-        Decimal::percent(2),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
-    );
-
-    let amount = Uint128::from(1_000_000_000u128);
-    let expected_after_amount = std::cmp::max(
-        amount.checked_sub(amount * tax_rate).unwrap(),
-        amount.checked_sub(tax_cap).unwrap(),
-    );
-
-    let after_amount = (Asset {
-        info: AssetInfo::NativeToken {
-            denom: "uusd".to_string(),
-        },
-        amount,
-    })
-    .deduct_tax(&deps.as_ref().querier)
-    .unwrap();
-
-    assert_eq!(expected_after_amount, after_amount.amount);
-}
-
-#[test]
 fn test_query_pool() {
     let total_share_amount = Uint128::from(111u128);
     let asset_0_amount = Uint128::from(222u128);
@@ -1162,12 +1137,8 @@ fn test_query_pool() {
 
     let msg = InstantiateMsg {
         asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset0000"),
-            },
+            AssetInfo::Native("uusd".to_string()),
+            AssetInfo::Cw20(Addr::unchecked("asset0000")),
         ],
         token_code_id: 10u64,
         factory: Addr::unchecked("factory0000"),
@@ -1194,21 +1165,17 @@ fn test_query_pool() {
 
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
-    let res: PoolResponse = query_pool(deps.as_ref()).unwrap();
-
+    let res: PoolResponse =
+        from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Pool {}).unwrap()).unwrap();
     assert_eq!(
         res.assets,
         [
             Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
+                info: AssetInfo::Native("uusd".to_string()),
                 amount: asset_0_amount
             },
             Asset {
-                info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
                 amount: asset_1_amount
             }
         ]

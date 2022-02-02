@@ -2,7 +2,7 @@ pub mod contract;
 pub mod state;
 
 mod error;
-mod response;
+mod parse_reply;
 
 #[cfg(test)]
 mod testing;

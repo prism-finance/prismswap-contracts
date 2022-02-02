@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Coin, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
+    from_binary, to_binary, Addr, Coin, CosmosMsg, StdError, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::contract::{execute, instantiate, query};
@@ -71,28 +71,16 @@ fn execute_swap_operations() {
                 ask_denom: "ukrw".to_string(),
             },
             SwapOperation::PrismSwap {
-                offer_asset_info: AssetInfo::NativeToken {
-                    denom: "ukrw".to_string(),
-                },
-                ask_asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0001"),
-                },
+                offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
             },
             SwapOperation::PrismSwap {
-                offer_asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0001"),
-                },
-                ask_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
-                },
+                offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                ask_asset_info: AssetInfo::Native("uluna".to_string()),
             },
             SwapOperation::PrismSwap {
-                offer_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
-                },
-                ask_asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0002"),
-                },
+                offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
             },
         ],
         minimum_receive: Some(Uint128::from(1000000u128)),
@@ -121,12 +109,8 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::NativeToken {
-                            denom: "ukrw".to_string(),
-                        },
-                        ask_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0001"),
-                        },
+                        offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                        ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
                     },
                     to: None,
                 })
@@ -137,12 +121,8 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0001"),
-                        },
-                        ask_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
-                        },
+                        offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                        ask_asset_info: AssetInfo::Native("uluna".to_string()),
                     },
                     to: None,
                 })
@@ -153,12 +133,8 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
-                        },
-                        ask_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0002"),
-                        },
+                        offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                        ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
                     },
                     to: Some(Addr::unchecked("addr0000")),
                 })
@@ -168,9 +144,7 @@ fn execute_swap_operations() {
                 contract_addr: MOCK_CONTRACT_ADDR.to_string(),
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::AssertMinimumReceive {
-                    asset_info: AssetInfo::Token {
-                        contract_addr: Addr::unchecked("asset0002"),
-                    },
+                    asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
                     prev_balance: Uint128::zero(),
                     minimum_receive: Uint128::from(1000000u128),
                     receiver: Addr::unchecked("addr0000"),
@@ -190,28 +164,16 @@ fn execute_swap_operations() {
                     ask_denom: "ukrw".to_string(),
                 },
                 SwapOperation::PrismSwap {
-                    offer_asset_info: AssetInfo::NativeToken {
-                        denom: "ukrw".to_string(),
-                    },
-                    ask_asset_info: AssetInfo::Token {
-                        contract_addr: Addr::unchecked("asset0001"),
-                    },
+                    offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                    ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
                 },
                 SwapOperation::PrismSwap {
-                    offer_asset_info: AssetInfo::Token {
-                        contract_addr: Addr::unchecked("asset0001"),
-                    },
-                    ask_asset_info: AssetInfo::NativeToken {
-                        denom: "uluna".to_string(),
-                    },
+                    offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                    ask_asset_info: AssetInfo::Native("uluna".to_string()),
                 },
                 SwapOperation::PrismSwap {
-                    offer_asset_info: AssetInfo::NativeToken {
-                        denom: "uluna".to_string(),
-                    },
-                    ask_asset_info: AssetInfo::Token {
-                        contract_addr: Addr::unchecked("asset0002"),
-                    },
+                    offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                    ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
                 },
             ],
             minimum_receive: None,
@@ -242,12 +204,8 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::NativeToken {
-                            denom: "ukrw".to_string(),
-                        },
-                        ask_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0001"),
-                        },
+                        offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                        ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
                     },
                     to: None,
                 })
@@ -258,12 +216,8 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0001"),
-                        },
-                        ask_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
-                        },
+                        offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                        ask_asset_info: AssetInfo::Native("uluna".to_string()),
                     },
                     to: None,
                 })
@@ -274,18 +228,45 @@ fn execute_swap_operations() {
                 funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: SwapOperation::PrismSwap {
-                        offer_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
-                        },
-                        ask_asset_info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset0002"),
-                        },
+                        offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                        ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0002")),
                     },
                     to: Some(Addr::unchecked("addr0002"),),
                 })
                 .unwrap(),
             }))
         ]
+    );
+
+    // failure - invalid token addr
+    let msg = ExecuteMsg::ExecuteSwapOperations {
+        operations: vec![
+            SwapOperation::NativeSwap {
+                offer_denom: "uusd".to_string(),
+                ask_denom: "ukrw".to_string(),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0001")),
+                ask_asset_info: AssetInfo::Native("uluna".to_string()),
+            },
+            SwapOperation::PrismSwap {
+                offer_asset_info: AssetInfo::Native("uluna".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("te")),
+            },
+        ],
+        minimum_receive: Some(Uint128::from(1000000u128)),
+        to: None,
+    };
+
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        StdError::generic_err("Invalid input: human address too short")
     );
 }
 
@@ -303,10 +284,6 @@ fn execute_swap_operation() {
 
     deps.querier
         .with_pairs(&[(&"uusdasset".to_string(), &"pair".to_string())]);
-    deps.querier.with_tax(
-        Decimal::percent(5),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
-    );
     deps.querier.with_balance(&[(
         MOCK_CONTRACT_ADDR.to_string(),
         &[Coin {
@@ -359,7 +336,7 @@ fn execute_swap_operation() {
             "addr0000".to_string(),
             Coin {
                 denom: "uusd".to_string(),
-                amount: Uint128::from(952380u128), // deduct tax
+                amount: Uint128::from(1000000u128),
             },
             "uluna".to_string()
         ))],
@@ -373,12 +350,8 @@ fn execute_swap_operation() {
 
     let msg = ExecuteMsg::ExecuteSwapOperation {
         operation: SwapOperation::PrismSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
+            offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset")),
+            ask_asset_info: AssetInfo::Native("uusd".to_string()),
         },
         to: Some(Addr::unchecked("addr0000")),
     };
@@ -395,9 +368,7 @@ fn execute_swap_operation() {
                 amount: Uint128::from(1000000u128),
                 msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset: Asset {
-                        info: AssetInfo::Token {
-                            contract_addr: Addr::unchecked("asset"),
-                        },
+                        info: AssetInfo::Cw20(Addr::unchecked("asset")),
                         amount: Uint128::from(1000000u128),
                     },
                     belief_price: None,
@@ -424,15 +395,6 @@ fn query_buy_with_routes() {
     // we can just call .unwrap() to assert this was a success
     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set tax rate as 5%
-    deps.querier.with_tax(
-        Decimal::percent(5),
-        &[
-            (&"uusd".to_string(), &Uint128::from(1000000u128)),
-            (&"ukrw".to_string(), &Uint128::from(1000000u128)),
-        ],
-    );
-
     let msg = QueryMsg::SimulateSwapOperations {
         offer_amount: Uint128::from(1000000u128),
         operations: vec![
@@ -441,26 +403,18 @@ fn query_buy_with_routes() {
                 ask_denom: "ukrw".to_string(),
             },
             SwapOperation::PrismSwap {
-                offer_asset_info: AssetInfo::NativeToken {
-                    denom: "ukrw".to_string(),
-                },
-                ask_asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
+                offer_asset_info: AssetInfo::Native("ukrw".to_string()),
+                ask_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
             },
             SwapOperation::PrismSwap {
-                offer_asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset0000"),
-                },
-                ask_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
-                },
+                offer_asset_info: AssetInfo::Cw20(Addr::unchecked("asset0000")),
+                ask_asset_info: AssetInfo::Native("uluna".to_string()),
             },
         ],
     };
 
     deps.querier.with_pairs(&[
-        (&"ukrwasset0000".to_string(), &"pair0000".to_string()),
+        (&"asset0000ukrw".to_string(), &"pair0000".to_string()),
         (&"asset0000uluna".to_string(), &"pair0001".to_string()),
     ]);
 
@@ -469,7 +423,7 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
-            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => asset0000, asset0000 => uluna
+            amount: Uint128::from(1000000u128),
         }
     );
 
@@ -492,7 +446,7 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
-            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => uluna
+            amount: Uint128::from(1000000u128),
         }
     );
 }
@@ -511,9 +465,7 @@ fn assert_minimum_receive_native_token() {
     let info = mock_info("addr0000", &[]);
     // success
     let msg = ExecuteMsg::AssertMinimumReceive {
-        asset_info: AssetInfo::NativeToken {
-            denom: "uusd".to_string(),
-        },
+        asset_info: AssetInfo::Native("uusd".to_string()),
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000000u128),
         receiver: Addr::unchecked("addr0000"),
@@ -522,9 +474,7 @@ fn assert_minimum_receive_native_token() {
 
     // assertion failed; native token
     let msg = ExecuteMsg::AssertMinimumReceive {
-        asset_info: AssetInfo::NativeToken {
-            denom: "uusd".to_string(),
-        },
+        asset_info: AssetInfo::Native("uusd".to_string()),
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000001u128),
         receiver: Addr::unchecked("addr0000"),
@@ -550,9 +500,7 @@ fn assert_minimum_receive_token() {
     let info = mock_info("addr0000", &[]);
     // success
     let msg = ExecuteMsg::AssertMinimumReceive {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("token0000"),
-        },
+        asset_info: AssetInfo::Cw20(Addr::unchecked("token0000")),
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000000u128),
         receiver: Addr::unchecked("addr0000"),
@@ -561,9 +509,7 @@ fn assert_minimum_receive_token() {
 
     // assertion failed; native token
     let msg = ExecuteMsg::AssertMinimumReceive {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("token0000"),
-        },
+        asset_info: AssetInfo::Cw20(Addr::unchecked("token0000")),
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000001u128),
         receiver: Addr::unchecked("addr0000"),
@@ -576,4 +522,18 @@ fn assert_minimum_receive_token() {
         ),
         _ => panic!("DO NOT ENTER HERE"),
     }
+
+    // failure - invalid token
+    let msg = ExecuteMsg::AssertMinimumReceive {
+        asset_info: AssetInfo::Cw20(Addr::unchecked("te")),
+        prev_balance: Uint128::zero(),
+        minimum_receive: Uint128::from(1000001u128),
+        receiver: Addr::unchecked("addr0000"),
+    };
+    let info = mock_info("addr0000", &[]);
+    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        StdError::generic_err("Invalid input: human address too short")
+    );
 }

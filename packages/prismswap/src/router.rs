@@ -1,10 +1,9 @@
+use cw_asset::AssetInfo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Addr, Uint128};
 use cw20::Cw20ReceiveMsg;
-
-use crate::asset::AssetInfo;
 
 pub const MAX_SWAP_OPERATIONS: usize = 50;
 
@@ -40,9 +39,7 @@ pub enum SwapOperation {
 impl SwapOperation {
     pub fn get_target_asset_info(&self) -> AssetInfo {
         match self {
-            SwapOperation::NativeSwap { ask_denom, .. } => AssetInfo::NativeToken {
-                denom: ask_denom.clone(),
-            },
+            SwapOperation::NativeSwap { ask_denom, .. } => AssetInfo::Native(ask_denom.to_string()),
             SwapOperation::PrismSwap { ask_asset_info, .. } => ask_asset_info.clone(),
         }
     }

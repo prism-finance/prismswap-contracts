@@ -1,8 +1,7 @@
 pub mod contract;
-pub mod state;
-
+mod parse_reply;
 mod querier;
-mod response;
+pub mod state;
 
 #[cfg(test)]
 mod testing;
