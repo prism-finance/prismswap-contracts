@@ -1,6 +1,6 @@
 [package]
 name = "prismswap-router"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2018"
 
 exclude = [
@@ -33,7 +33,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 [dependencies]
 cw20 = { version = "0.8.0" } 
 cosmwasm-std = { version = "0.16.0" }
-prismswap = { path = "../../packages/prismswap", default-features = false, version = "0.1.0"}
+prismswap = { path = "../../packages/prismswap", default-features = false, version = "1.0.0"}
 terra-cosmwasm = "2.2.0"
 cw-storage-plus = { version = "0.8.0"}
 schemars = "0.8.1"

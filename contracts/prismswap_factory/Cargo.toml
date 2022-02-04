@@ -1,6 +1,6 @@
 [package]
 name = "prismswap-factory"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2018"
 
 exclude = [
@@ -31,7 +31,7 @@ overflow-checks = true
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-prismswap = { path = "../../packages/prismswap", default-features = false, version = "0.1.0"}
+prismswap = { path = "../../packages/prismswap", default-features = false, version = "1.0.0"}
 cosmwasm-std = { version = "0.16.0" }
 cw-storage-plus = { version = "0.8.0" } 
 schemars = "0.8.1"

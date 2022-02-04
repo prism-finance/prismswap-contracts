@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "prismswap"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "prismswap-factory"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "prismswap-pair"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmwasm-bignumber",
  "cosmwasm-schema",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "prismswap-router"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "prismswap-token"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",

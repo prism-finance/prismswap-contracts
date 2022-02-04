@@ -1,6 +1,6 @@
 [package]
 name = "prismswap-token"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2018"
 
 [lib]
@@ -12,7 +12,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-prismswap = { path = "../../packages/prismswap", default-features = false, version = "0.1.0"}
+prismswap = { path = "../../packages/prismswap", default-features = false, version = "1.0.0"}
 cw2 = "0.8"
 cw20 = "0.8"
 cw20-base = { version = "0.8", features = ["library"] }
