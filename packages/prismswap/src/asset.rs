@@ -55,6 +55,7 @@ pub trait PrismSwapAssetInfo {
     fn is_native_token(&self) -> bool;
     fn query_pool(&self, querier: &QuerierWrapper, pool_addr: &Addr) -> StdResult<Uint128>;
     fn as_bytes(&self) -> &[u8];
+    fn to_string_legacy(&self) -> String;
     fn check(&self, api: &dyn Api) -> StdResult<()>;
 }
 
@@ -98,6 +99,13 @@ impl PrismSwapAssetInfo for AssetInfo {
         }
     }
 
+    fn to_string_legacy(&self) -> String {
+        match self {
+            AssetInfo::Cw20(contract_addr) => contract_addr.to_string(),
+            AssetInfo::Native(denom) => denom.to_string(),
+        }
+    }
+
     fn check(&self, api: &dyn Api) -> StdResult<()> {
         if let AssetInfo::Cw20(addr) = self {
             api.addr_validate(addr.as_str())?;
@@ -114,6 +122,7 @@ pub trait PrismSwapAsset {
         to: Option<String>,
     ) -> StdResult<CosmosMsg<TerraMsgWrapper>>;
     fn assert_sent_native_token_balance(&self, info: &MessageInfo) -> StdResult<()>;
+    fn to_string_legacy(&self) -> String;
 }
 
 impl PrismSwapAsset for Asset {
@@ -178,5 +187,8 @@ impl PrismSwapAsset for Asset {
         } else {
             Ok(())
         }
+    }
+    fn to_string_legacy(&self) -> String {
+        format!("{}:{}", self.info.to_string_legacy(), self.amount)
     }
 }
