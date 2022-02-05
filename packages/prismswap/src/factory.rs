@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_TOTAL_FEE: &str = "0.003";
 pub const MAX_TOTAL_FEE: &str = "0.05";
-pub const DEFAULT_PROTOCOL_FEE: &str = "0.5";
+pub const DEFAULT_PROTOCOL_FEE: &str = "0.334";
 pub const MAX_PROTOCOL_FEE: &str = "0.8";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

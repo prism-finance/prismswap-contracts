@@ -97,7 +97,19 @@ pub fn receive_cw20(
             operations,
             minimum_receive,
             to,
-        } => execute_swap_operations(deps, env, sender, operations, minimum_receive, to),
+        } => {
+            for operation in &operations {
+                if let SwapOperation::PrismSwap {
+                    offer_asset_info,
+                    ask_asset_info,
+                } = &operation
+                {
+                    offer_asset_info.check(deps.api)?;
+                    ask_asset_info.check(deps.api)?;
+                };
+            }
+            execute_swap_operations(deps, env, sender, operations, minimum_receive, to)
+        }
     }
 }
 

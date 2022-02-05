@@ -88,7 +88,7 @@ fn proper_initialization() {
                 })
                 .unwrap(),
                 funds: vec![],
-                label: "PrismSwap LP token".to_string(),
+                label: "".to_string(),
                 admin: None,
             }
             .into(),

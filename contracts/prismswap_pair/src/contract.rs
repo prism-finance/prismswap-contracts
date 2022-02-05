@@ -66,7 +66,7 @@ pub fn instantiate(
             })?,
             funds: vec![],
             admin: None,
-            label: String::from("PrismSwap LP token"),
+            label: "".to_string(),
         }
         .into(),
         id: INSTANTIATE_REPLY_ID,
