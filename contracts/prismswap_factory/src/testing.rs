@@ -27,6 +27,7 @@ fn proper_initialization() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let info = mock_info("addr0000", &[]);
@@ -51,6 +52,7 @@ fn update_config() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let info = mock_info("owner0000", &[]);
@@ -65,6 +67,7 @@ fn update_config() {
         pair_code_id: None,
         token_code_id: None,
         collector: None,
+        pairs_admin: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -86,6 +89,7 @@ fn update_config() {
         pair_code_id: Some(100u64),
         token_code_id: Some(200u64),
         collector: Some(Addr::unchecked("collector0001")),
+        pairs_admin: None,
     };
 
     let res = execute(deps.as_mut(), env, info, msg).unwrap();
@@ -107,6 +111,7 @@ fn update_config() {
         pair_code_id: None,
         token_code_id: None,
         collector: None,
+        pairs_admin: None,
     };
 
     let res = execute(deps.as_mut(), env, info, msg);
@@ -125,6 +130,7 @@ fn create_pair() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let env = mock_env();
@@ -173,7 +179,7 @@ fn create_pair() {
                 code_id: 321u64,
                 funds: vec![],
                 label: "".to_string(),
-                admin: None,
+                admin: Some("admin0000".to_string())
             }
             .into()
         },]
@@ -290,6 +296,7 @@ fn create_pair_2() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let env = mock_env();
@@ -384,7 +391,7 @@ fn create_pair_2() {
                 code_id: 321u64,
                 funds: vec![],
                 label: "".to_string(),
-                admin: None,
+                admin: Some("admin0000".to_string()),
             }
             .into()
         },]
@@ -481,6 +488,7 @@ fn test_update_pair_config() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let env = mock_env();
@@ -617,6 +625,7 @@ fn test_deregister() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let env = mock_env();
@@ -716,6 +725,7 @@ fn test_queries() {
         token_code_id: 123u64,
         owner: Addr::unchecked("owner0000"),
         collector: Addr::unchecked("collector0000"),
+        pairs_admin: Addr::unchecked("admin0000"),
     };
 
     let env = mock_env();

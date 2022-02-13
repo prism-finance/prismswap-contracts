@@ -5,6 +5,7 @@ use cosmwasm_std::{
     StdResult, SubMsg, WasmMsg,
 };
 
+use crate::migration::migrate_config;
 use crate::parse_reply::parse_reply_instantiate_data;
 use crate::querier::query_pair_info;
 use crate::state::{
@@ -26,10 +27,11 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let config = Config {
-        owner: msg.owner,
+        owner: deps.api.addr_validate(msg.owner.as_str())?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
-        collector: msg.collector,
+        collector: deps.api.addr_validate(msg.collector.as_str())?,
+        pairs_admin: deps.api.addr_validate(msg.pairs_admin.as_str())?,
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -45,7 +47,16 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             token_code_id,
             pair_code_id,
             collector,
-        } => execute_update_config(deps, info, owner, token_code_id, pair_code_id, collector),
+            pairs_admin,
+        } => execute_update_config(
+            deps,
+            info,
+            owner,
+            token_code_id,
+            pair_code_id,
+            collector,
+            pairs_admin,
+        ),
         ExecuteMsg::CreatePair {
             asset_infos,
             fee_config,
@@ -78,6 +89,7 @@ pub fn execute_update_config(
     token_code_id: Option<u64>,
     pair_code_id: Option<u64>,
     collector: Option<Addr>,
+    pairs_admin: Option<Addr>,
 ) -> StdResult<Response> {
     let mut config: Config = CONFIG.load(deps.storage)?;
 
@@ -87,6 +99,7 @@ pub fn execute_update_config(
     }
 
     if let Some(owner) = owner {
+        deps.api.addr_validate(owner.as_str())?;
         config.owner = owner;
     }
 
@@ -99,7 +112,13 @@ pub fn execute_update_config(
     }
 
     if let Some(collector) = collector {
+        deps.api.addr_validate(collector.as_str())?;
         config.collector = collector;
+    }
+
+    if let Some(pairs_admin) = pairs_admin {
+        deps.api.addr_validate(pairs_admin.as_str())?;
+        config.pairs_admin = pairs_admin;
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -154,7 +173,7 @@ pub fn execute_create_pair(
             msg: WasmMsg::Instantiate {
                 code_id: config.pair_code_id,
                 funds: vec![],
-                admin: None,
+                admin: Some(config.pairs_admin.to_string()),
                 label: "".to_string(),
                 msg: to_binary(&PairInstantiateMsg {
                     asset_infos,
@@ -270,6 +289,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         token_code_id: config.token_code_id,
         pair_code_id: config.pair_code_id,
         collector: config.collector,
+        pairs_admin: config.pairs_admin,
     };
 
     Ok(resp)
@@ -346,6 +366,9 @@ pub fn query_pairs_config(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    let pairs_admin: Addr = deps.api.addr_validate(msg.pairs_admin.as_str())?;
+    migrate_config(deps.storage, pairs_admin)?;
+
     Ok(Response::default())
 }

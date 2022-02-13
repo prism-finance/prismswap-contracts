@@ -7,6 +7,7 @@
     "collector",
     "owner",
     "pair_code_id",
+    "pairs_admin",
     "token_code_id"
   ],
   "properties": {
@@ -31,6 +32,14 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
+    },
+    "pairs_admin": {
+      "description": "Address assigned as admin to instantiated pairs",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Addr"
+        }
+      ]
     },
     "token_code_id": {
       "description": "CW20 token contract code identifier",
