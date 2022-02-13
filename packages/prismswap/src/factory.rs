@@ -47,6 +47,8 @@ pub struct InstantiateMsg {
     pub collector: Addr,
     /// address allowed to create pairs and update configuration
     pub owner: Addr,
+    /// address assigned as admin to instantiated pairs
+    pub pairs_admin: Addr,
 }
 
 /// ## Description
@@ -64,6 +66,8 @@ pub enum ExecuteMsg {
         collector: Option<Addr>,
         /// address allowed to create pairs and update configuration
         owner: Option<Addr>,
+        /// address assigned as admin to instantiated pairs
+        pairs_admin: Option<Addr>,
     },
     /// UpdatePairConfig updates configs of pair
     UpdatePairConfig {
@@ -136,6 +140,8 @@ pub struct ConfigResponse {
     pub pair_code_id: u64,
     /// Contract address to send fees to
     pub collector: Addr,
+    /// Address assigned as admin to instantiated pairs
+    pub pairs_admin: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -146,9 +152,10 @@ pub struct PairConfigResponse {
 
 /// ## Description
 /// This structure describes a migration message.
-/// We currently take no arguments for migrations.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub pairs_admin: Addr,
+}
 
 /// ## Description
 /// A custom struct for each query response that returns an array of objects type [`PairInfo`].

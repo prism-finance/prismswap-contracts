@@ -14,6 +14,7 @@ pub struct Config {
     pub pair_code_id: u64,
     pub token_code_id: u64,
     pub collector: Addr,
+    pub pairs_admin: Addr,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
