@@ -718,16 +718,13 @@ fn format_lp_token_name(
 ) -> Result<String, ContractError> {
     let mut short_symbols: Vec<String> = vec![];
     for asset_info in asset_infos {
-        let short_symbol: String;
-        match asset_info {
-            AssetInfo::Native(denom) => {
-                short_symbol = denom.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
-            }
+        let short_symbol: String = match asset_info {
+            AssetInfo::Native(denom) => denom.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect(),
             AssetInfo::Cw20(contract_addr) => {
                 let token_symbol = query_token_symbol(querier, contract_addr)?;
-                short_symbol = token_symbol.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect();
+                token_symbol.chars().take(TOKEN_SYMBOL_MAX_LENGTH).collect()
             }
-        }
+        };
         short_symbols.push(short_symbol);
     }
     Ok(format!("{}-{}-LP", short_symbols[0], short_symbols[1]).to_uppercase())

@@ -466,15 +466,12 @@ dependencies = [
 name = "prismswap"
 version = "1.0.1"
 dependencies = [
- "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
- "cw-storage-plus",
  "cw20 0.8.0",
  "schemars",
  "serde",
  "terra-cosmwasm",
- "uint",
 ]
 
 [[package]]
